@@ -1,0 +1,26 @@
+@url = http://localhost:3000/todos
+
+### GET /todos
+GET {{url}}
+
+### POST /todos
+POST {{url}}
+Content-Type: application/json
+
+{
+  "title": "My Todo",
+  "description": "This is a sample todo item"
+}
+
+
+### GET /todos/:id
+GET {{url}}/367550a2-52c0-4ddb-8490-be3fe0983803
+
+### PUT /todos/:id
+PATCH  {{url}}/367550a2-52c0-4ddb-8490-be3fe0983803
+Content-Type: application/json
+
+{
+  "title": "Updated Todo",
+  "description": "This is an updated description"
+}

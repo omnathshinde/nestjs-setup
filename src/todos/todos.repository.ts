@@ -2,7 +2,12 @@ import { Injectable } from "@nestjs/common";
 
 import { TodoModel } from "@/database/models/todo.model";
 import { GetAllResponse } from "@/types/api.types";
-import type { Todo } from "@/types/todos.types";
+import type { Todo, TodoStatus } from "@/types/todos.types";
+
+interface FindAllQuery {
+	search?: string;
+	status?: TodoStatus;
+}
 
 @Injectable()
 export class TodosRepository {
@@ -11,13 +16,19 @@ export class TodosRepository {
 		return todo.toJSON() as Todo;
 	}
 
-	async findAll(): Promise<GetAllResponse<Todo>> {
-		const todos = await TodoModel.scan().exec();
+	async findAll(query: FindAllQuery): Promise<GetAllResponse<Todo>> {
+		const { search, status } = query;
+
+		let scan = TodoModel.scan();
+		if (status && status !== ("ALL" as TodoStatus)) {
+			scan = scan.where("status").eq(status);
+		}
+		if (search?.trim()) {
+			scan = scan.where("title").contains(search);
+		}
+		const todos = await scan.exec();
 		const data = todos.map((todo) => todo.toJSON() as Todo);
-		return {
-			count: data.length,
-			data,
-		};
+		return { count: data.length, data };
 	}
 
 	async findOne(id: string): Promise<Todo | null> {

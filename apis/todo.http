@@ -17,10 +17,11 @@ Content-Type: application/json
 GET {{url}}/367550a2-52c0-4ddb-8490-be3fe0983803
 
 ### PUT /todos/:id
-PATCH  {{url}}/367550a2-52c0-4ddb-8490-be3fe0983803
+PATCH  {{url}}/d242c18-1d8b-49a5-9228-8ef27c61cd28
 Content-Type: application/json
 
 {
   "title": "Updated Todo",
-  "description": "This is an updated description"
+  "description": "This is an updated description",
+  "status": "IN_PROGRESS"
 }

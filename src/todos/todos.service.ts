@@ -1,11 +1,16 @@
 import { Injectable } from "@nestjs/common";
 
 import { GetAllResponse } from "@/types/api.types";
-import type { Todo } from "@/types/todos.types";
+import type { Todo, TodoStatus } from "@/types/todos.types";
 
 import { CreateTodoDto } from "./dto/create-todo.dto";
 import { UpdateTodoDto } from "./dto/update-todo.dto";
 import { TodosRepository } from "./todos.repository";
+
+interface FindAllQuery {
+	search?: string;
+	status?: TodoStatus;
+}
 
 @Injectable()
 export class TodosService {
@@ -15,8 +20,8 @@ export class TodosService {
 		return this.todosRepository.create(body);
 	}
 
-	async findAll(): Promise<GetAllResponse<Todo>> {
-		return this.todosRepository.findAll();
+	async findAll(query: FindAllQuery): Promise<GetAllResponse<Todo>> {
+		return this.todosRepository.findAll(query);
 	}
 
 	async findOne(id: string): Promise<Todo | null> {

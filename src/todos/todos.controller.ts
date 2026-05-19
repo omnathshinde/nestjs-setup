@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+
+import { TodoStatus } from "@/types/todos.types";
 
 import { CreateTodoDto } from "./dto/create-todo.dto";
 import { UpdateTodoDto } from "./dto/update-todo.dto";
@@ -14,8 +16,16 @@ export class TodosController {
 	}
 
 	@Get()
-	findAll() {
-		return this.todosService.findAll();
+	findAll(
+		@Query("search")
+		search?: string,
+		@Query("status")
+		status?: TodoStatus,
+	) {
+		return this.todosService.findAll({
+			search,
+			status,
+		});
 	}
 
 	@Get(":id")

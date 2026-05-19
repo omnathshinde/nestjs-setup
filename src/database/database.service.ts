@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
 import type { Item } from "dynamoose/dist/Item";
 import type { Model } from "dynamoose/dist/Model";
 
+import { s3 } from "@/configs/aws.config";
 import { DatabaseModel, models } from "@/database/models/index";
 
 @Injectable()
@@ -14,6 +16,7 @@ export class DatabaseService implements OnModuleInit {
 		for (const modelConfig of models as readonly DatabaseModel[]) {
 			await this.prepareTable(modelConfig.name, modelConfig.model);
 		}
+		await this.initializeS3();
 		this.logger.log("DynamoDB ready");
 		this.logModelRegistry();
 	}
@@ -48,5 +51,30 @@ export class DatabaseService implements OnModuleInit {
 			this.logger.log(`→ Table: ${model.name} | Model: ${model.model.table().name}`);
 		}
 		this.logger.log("✅ All DynamoDB tables are initialized and ready.");
+	}
+
+	private async initializeS3(): Promise<void> {
+		const bucketName = "todos-files";
+		try {
+			await s3.send(
+				new CreateBucketCommand({
+					Bucket: bucketName,
+				}),
+			);
+			this.logger.log(`Created S3 bucket: ${bucketName}`);
+		} catch (error: unknown) {
+			if (
+				error instanceof Error &&
+				(error.name === "BucketAlreadyOwnedByYou" || error.name === "BucketAlreadyExists")
+			) {
+				this.logger.log(`S3 bucket already exists: ${bucketName}`);
+				return;
+			}
+			if (error instanceof Error) {
+				this.logger.error(`S3 init failed: ${error.message}`);
+				return;
+			}
+			this.logger.error("Unknown S3 initialization error");
+		}
 	}
 }

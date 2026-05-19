@@ -1,4 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { UploadedFile, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 
 import { TodoStatus } from "@/types/todos.types";
 
@@ -11,10 +13,15 @@ export class TodosController {
 	constructor(private readonly todosService: TodosService) {}
 
 	@Post()
-	create(@Body() body: CreateTodoDto) {
-		return this.todosService.create(body);
+	@UseInterceptors(FileInterceptor("file"))
+	create(
+		@Body()
+		body: CreateTodoDto,
+		@UploadedFile()
+		file?: Express.Multer.File,
+	) {
+		return this.todosService.create(body, file);
 	}
-
 	@Get()
 	findAll(
 		@Query("search")
@@ -32,12 +39,19 @@ export class TodosController {
 	findOne(@Param("id") id: string) {
 		return this.todosService.findOne(id);
 	}
-
 	@Patch(":id")
-	update(@Param("id") id: string, @Body() body: UpdateTodoDto) {
-		return this.todosService.update(id, body);
-	}
+	@UseInterceptors(FileInterceptor("file"))
+	update(
+		@Param("id") id: string,
 
+		@Body()
+		body: UpdateTodoDto,
+
+		@UploadedFile()
+		file?: Express.Multer.File,
+	) {
+		return this.todosService.update(id, body, file);
+	}
 	@Delete(":id")
 	remove(@Param("id") id: string) {
 		return this.todosService.remove(id);

@@ -24,13 +24,18 @@ export class TodosService {
 	) {}
 
 	async create(body: CreateTodoDto, file?: Express.Multer.File): Promise<Todo> {
-		let fileUrl: string | undefined;
+		let uploadedFile: Todo["file"] | undefined;
 
 		if (file) {
-			fileUrl = await this.uploadsService.uploadFile(file);
+			uploadedFile = await this.uploadsService.uploadFile(file);
 		}
 
-		const todo = await this.todosRepository.create({ ...body, fileUrl });
+		const todo = await this.todosRepository.create({
+			...body,
+			...(uploadedFile && {
+				file: uploadedFile,
+			}),
+		});
 
 		if (body.reminderAt) {
 			await this.reminderProducer.scheduleReminder({
@@ -44,11 +49,30 @@ export class TodosService {
 		return todo;
 	}
 	async findAll(query: FindAllQuery): Promise<GetAllResponse<Todo>> {
-		return this.todosRepository.findAll(query);
+		const result = await this.todosRepository.findAll(query);
+		const data = await Promise.all(
+			result.data.map(async (todo) => {
+				if (todo.file) {
+					todo.file = await this.uploadsService.attachPresignedUrl(todo.file);
+				}
+				return todo;
+			}),
+		);
+		return { count: result.count, data };
 	}
 
 	async findOne(id: string): Promise<Todo | null> {
-		return this.todosRepository.findOne(id);
+		const todo = await this.todosRepository.findOne(id);
+
+		if (!todo) {
+			return null;
+		}
+
+		if (todo.file) {
+			todo.file = await this.uploadsService.attachPresignedUrl(todo.file);
+		}
+
+		return todo;
 	}
 
 	async update(id: string, body: UpdateTodoDto, file?: Express.Multer.File): Promise<Todo | null> {
@@ -56,13 +80,18 @@ export class TodosService {
 		if (!existing) {
 			return null;
 		}
-		let fileUrl: string | undefined;
+		let uploadedFile: Todo["file"] | undefined;
 
 		if (file) {
-			fileUrl = await this.uploadsService.uploadFile(file);
+			uploadedFile = await this.uploadsService.uploadFile(file);
 		}
 
-		const updated = await this.todosRepository.update(id, { ...body, ...(fileUrl && { fileUrl }) });
+		const updated = await this.todosRepository.update(id, {
+			...body,
+			...(uploadedFile && {
+				file: uploadedFile,
+			}),
+		});
 		if (!updated) {
 			return null;
 		}
@@ -76,7 +105,15 @@ export class TodosService {
 		}
 		return updated;
 	}
+
 	async remove(id: string): Promise<void> {
+		const todo = await this.todosRepository.findOne(id);
+		if (!todo) {
+			return;
+		}
+		if (todo.file?.key) {
+			await this.uploadsService.deleteFile(todo.file.key);
+		}
 		return this.todosRepository.remove(id);
 	}
 }

@@ -10,7 +10,20 @@ export interface Todo {
 	description: string;
 	status: TodoStatus;
 	reminderAt?: string;
-	fileUrl?: string;
+	file?: TodoFile;
 	createdAt?: Date;
 	updatedAt?: Date;
+}
+
+export interface TodoFile {
+	key: string;
+	url: string;
+	name: string;
+	size: number;
+	mimeType: string;
+	extension: string;
+	etag: string;
+	uploadedAt: string;
+	status: "UPLOADING" | "UPLOADED" | "FAILED" | "DELETED";
+	storageProvider: string;
 }

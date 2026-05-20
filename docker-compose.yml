@@ -13,6 +13,7 @@ services:
             - AWS_DEFAULT_REGION=ap-south-1
             - AWS_ACCESS_KEY_ID=test
             - AWS_SECRET_ACCESS_KEY=test
+            - S3_SKIP_SIGNATURE_VALIDATION=0
 
         volumes:
             - "./volume:/var/lib/localstack"

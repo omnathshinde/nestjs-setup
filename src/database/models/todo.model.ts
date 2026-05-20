@@ -22,8 +22,29 @@ const TodoSchema = new dynamoose.Schema(
 			enum: ["PENDING", "IN_PROGRESS", "COMPLETED"],
 			default: "PENDING",
 		},
-		reminderAt: String,
-		fileUrl: String,
+		reminderAt: {
+			type: String,
+			index: {
+				name: "ReminderIndex",
+			},
+		},
+		reminderStatus: {
+			type: String,
+			default: "PENDING",
+			index: {
+				name: "ReminderStatusIndex",
+			},
+		},
+		file: {
+			type: Object,
+			schema: {
+				key: String,
+				url: String,
+				name: String,
+				size: Number,
+				mimeType: String,
+			},
+		},
 	},
 	{ timestamps: true },
 );

@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import type { Express } from "express";
 
+import { ReminderProducer } from "@/reminders/reminder.producer";
 import { GetAllResponse } from "@/types/api.types";
 import type { Todo, TodoStatus } from "@/types/todos.types";
 import { UploadsService } from "@/uploads/uploads.service";
@@ -19,6 +20,7 @@ export class TodosService {
 	constructor(
 		private readonly todosRepository: TodosRepository,
 		private readonly uploadsService: UploadsService,
+		private readonly reminderProducer: ReminderProducer,
 	) {}
 
 	async create(body: CreateTodoDto, file?: Express.Multer.File): Promise<Todo> {
@@ -28,7 +30,18 @@ export class TodosService {
 			fileUrl = await this.uploadsService.uploadFile(file);
 		}
 
-		return this.todosRepository.create({ ...body, fileUrl });
+		const todo = await this.todosRepository.create({ ...body, fileUrl });
+
+		if (body.reminderAt) {
+			await this.reminderProducer.scheduleReminder({
+				id: todo.id,
+				title: todo.title,
+				description: todo.description,
+				reminderAt: body.reminderAt,
+			});
+		}
+
+		return todo;
 	}
 	async findAll(query: FindAllQuery): Promise<GetAllResponse<Todo>> {
 		return this.todosRepository.findAll(query);
@@ -39,14 +52,30 @@ export class TodosService {
 	}
 
 	async update(id: string, body: UpdateTodoDto, file?: Express.Multer.File): Promise<Todo | null> {
+		const existing = await this.todosRepository.findOne(id);
+		if (!existing) {
+			return null;
+		}
 		let fileUrl: string | undefined;
 
 		if (file) {
 			fileUrl = await this.uploadsService.uploadFile(file);
 		}
-		return this.todosRepository.update(id, { ...body, ...(fileUrl && { fileUrl }) });
-	}
 
+		const updated = await this.todosRepository.update(id, { ...body, ...(fileUrl && { fileUrl }) });
+		if (!updated) {
+			return null;
+		}
+		if (body.reminderAt && body.reminderAt !== existing.reminderAt) {
+			await this.reminderProducer.scheduleReminder({
+				id: updated.id,
+				title: updated.title,
+				description: updated.description,
+				reminderAt: body.reminderAt,
+			});
+		}
+		return updated;
+	}
 	async remove(id: string): Promise<void> {
 		return this.todosRepository.remove(id);
 	}

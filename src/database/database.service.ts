@@ -1,22 +1,28 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { CreateQueueCommand } from "@aws-sdk/client-sqs";
 import type { Item } from "dynamoose/dist/Item";
 import type { Model } from "dynamoose/dist/Model";
 
 import { s3 } from "@/configs/aws.config";
+import { sqs } from "@/configs/sqs.config";
 import { DatabaseModel, models } from "@/database/models/index";
+import { ReminderConsumer } from "@/reminders/reminder.consumer";
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
+	constructor(private readonly reminderConsumer: ReminderConsumer) {}
 	private readonly logger = new Logger(DatabaseService.name);
 
 	async onModuleInit(): Promise<void> {
 		this.logger.log("Initializing DynamoDB...");
+		await this.initializeS3();
+		await this.initializeSqs();
+		void this.reminderConsumer.startPolling();
 		for (const modelConfig of models as readonly DatabaseModel[]) {
 			await this.prepareTable(modelConfig.name, modelConfig.model);
 		}
-		await this.initializeS3();
 		this.logger.log("DynamoDB ready");
 		this.logModelRegistry();
 	}
@@ -75,6 +81,23 @@ export class DatabaseService implements OnModuleInit {
 				return;
 			}
 			this.logger.error("Unknown S3 initialization error");
+		}
+	}
+
+	private async initializeSqs(): Promise<void> {
+		try {
+			await sqs.send(
+				new CreateQueueCommand({
+					QueueName: "todo-reminders",
+				}),
+			);
+
+			this.logger.log("SQS queue ready: todo-reminders");
+		} catch (error) {
+			if (error instanceof Error) {
+				this.logger.error(error.message);
+				return;
+			}
 		}
 	}
 }

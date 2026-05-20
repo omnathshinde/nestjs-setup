@@ -116,4 +116,13 @@ export class TodosService {
 		}
 		return this.todosRepository.remove(id);
 	}
+
+	async getFileUrl(id: string): Promise<string | null> {
+		const todo = await this.todosRepository.findOne(id);
+		if (!todo?.file) {
+			return null;
+		}
+		const file = await this.uploadsService.attachPresignedUrl(todo.file);
+		return file.url;
+	}
 }

@@ -56,4 +56,10 @@ export class TodosController {
 	remove(@Param("id") id: string) {
 		return this.todosService.remove(id);
 	}
+
+	@Get(":id/file")
+	async getFileUrl(@Param("id") id: string) {
+		const url = await this.todosService.getFileUrl(id);
+		return { url };
+	}
 }

@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseFilters } from "@nestjs/common";
 import { UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 
+import { MulterExceptionFilter } from "@/common/multer-exception.filter";
 import { TodoStatus } from "@/types/todos.types";
 
 import { CreateTodoDto } from "./dto/create-todo.dto";
@@ -39,8 +40,16 @@ export class TodosController {
 	findOne(@Param("id") id: string) {
 		return this.todosService.findOne(id);
 	}
+
 	@Patch(":id")
-	@UseInterceptors(FileInterceptor("file"))
+	@UseFilters(MulterExceptionFilter)
+	@UseInterceptors(
+		FileInterceptor("file", {
+			limits: {
+				fileSize: 10 * 1024 * 1024, // 10MB
+			},
+		}),
+	)
 	update(
 		@Param("id") id: string,
 

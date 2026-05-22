@@ -1,0 +1,539 @@
+Todo App
+Question - Base Architecture    
+------------------
+React Client (Browser/Mobile)
+        |
+     HTTPS
+        |  
+        v
+NestJS Server (API)
+        |
+        v
+    DynamoDB
+
+---------------------------------------------------------------------------------------------------
+Question - 1. React vs Angular
+| Criteria          | React (Chosen)                | Angular                           |
+| ----------------- | ----------------------------- | --------------------------------- |
+| Learning Curve    | Easier                        | Steeper                           |
+| Performance       | Fast (Virtual DOM)            | Good                              |
+| Flexibility       | High                          | Opinionated                       |
+| Ecosystem         | Huge                          | Large                             |
+| Bundle Size       | Smaller                       | Larger                            |
+| Team Productivity | Faster for small/medium teams | Better for large enterprise teams |
+| Best For          | Startup/product apps          | Enterprise apps                   |
+
+Why React?
+Pros:
+- Easy to learn
+- Reusable components
+- Large community support
+- Faster development
+
+Cons:
+- Need extra libraries for routing/state management
+- Less opinionated architecture
+
+---------------------------------------------------------------------------------------------------
+Question - 2. NestJS vs Express
+| Criteria             | NestJS (Chosen)  | Express        |
+| -------------------- | ---------------- | -------------- |
+| Architecture         | Built-in modular | Manual setup   |
+| TypeScript Support   | Native           | Add separately |
+| Scalability          | Excellent        | Medium         |
+| Boilerplate          | More             | Less           |
+| Learning Curve       | Moderate         | Easy           |
+| Testing              | Built-in         | Manual setup   |
+| Enterprise Readiness | High             | Medium         |
+
+Why NestJS?
+Pros:
+- Built-in Dependency Injection
+- Modular architecture
+- Easy microservices support
+- TypeScript-first
+
+Cons:
+- More boilerplate
+- Slightly slower initial development
+
+---------------------------------------------------------------------------------------------------
+Question - 3. DynamoDB vs PostgreSQL/MySQL vs MongoDB
+
+| Criteria        | DynamoDB (Chosen)        | PostgreSQL / MySQL     | MongoDB             |
+| --------------- | ------------------------ | ---------------------- | ------------------- |
+| Scalability     | Excellent                | Medium                 | Good                |
+| Managed Service | Fully managed            | Managed, tuning needed | Managed/self-hosted |
+| Schema          | Flexible                 | Fixed                  | Flexible            |
+| Joins           | No                       | Yes                    | Limited             |
+| Latency         | Very low                 | Medium                 | Medium              |
+| Cost at Scale   | Better                   | Higher                 | Medium              |
+| Best For        | Key-value, massive scale | Relational data        | Document data       |
+
+
+Why DynamoDB?
+Pros:
+- Serverless
+- Auto scaling
+- Very low latency
+- Great for millions of users
+- No server management
+
+Cons:
+-- No joins
+-- Query design is harder
+-- Partition key design is critical
+
+
+---------------------------------------------------------------------------------------------------
+
+Question - Service comparison for backend deployment
+
+| Service                 | How it works                        | Pros                                       | Cons                                             | Why not selected                          |
+| ----------------------- | ----------------------------------- | ------------------------------------------ | ------------------------------------------------ | ----------------------------------------- |
+| Amazon EC2              | Dedicated VM/server runs 24x7       | Full control, cheaper for constant traffic | Need server management, patching, manual scaling | High operational overhead                 |
+| Amazon ECS Fargate      | Runs Docker containers continuously | Easy container deployment, auto scaling    | Containers always running → higher cost          | Overkill for simple request-response APIs |
+| Amazon EKS              | Managed Kubernetes cluster          | Powerful, enterprise-grade                 | Complex setup, expensive                         | Too much complexity for this app          |
+| AWS Elastic Beanstalk   | PaaS over EC2                       | Easy setup                                 | Still EC2 underneath                             | Not fully serverless                      |
+| **AWS Lambda (Chosen)** | Function runs only on request       | Auto scaling, no server mgmt, pay per use  | Cold starts, 15-min limit                        | **Best fit**                              |
+
+
+Why Lambda fits our application
+
+| Requirement       | Why Lambda fits                  |
+| ----------------- | -------------------------------- |
+| Stateless API     | Lambda is stateless by design    |
+| Todo CRUD APIs    | Short-running requests are ideal |
+| Traffic spikes    | Auto-scales instantly            |
+| 1M+ users         | Handles high concurrency         |
+| Cost optimization | Pay only when invoked            |
+| Low maintenance   | No server patching/monitoring    |
+
+
+Client Request
+   |
+API Gateway
+   |
+AWS Lambda (NestJS)
+   |
++--> DynamoDB
++--> S3
++--> EventBridge
+
+
+Cost model of Lambda
+Pricing based on:
+| Parameter     | Description            |
+| ------------- | ---------------------- |
+| Requests      | Number of API calls    |
+| Duration      | How long function runs |
+| Memory        | Allocated RAM          |
+| Data transfer | outbound traffic       |
+
+---------------- No traffic = almost zero cost ---
+
+
+We use AWS Lambda because our backend is event-driven and request-based. 
+It provides automatic scaling, lower operational overhead, and better cost efficiency compared to always-on compute services like EC2 or ECS
+
+Good. Let’s analyze **all backend deployment options** for your NestJS app based on:
+
+* How it works
+* Pricing model
+* Performance
+* Scaling
+* Operational effort
+* Why we did/did not choose it
+
+-----------------------
+
+# 1. Amazon EC2
+How it works - You launch a virtual machine and deploy NestJS on it.
+|------------------------------------------------------------|
+| User -> Load Balancer -> EC2 Instance -> NestJS App        |
+|------------------------------------------------------------|
+
+App runs 24x7
+---
+Costing
+Charged based on:
+
+- instance type (CPU/RAM)
+- uptime (hour/month)
+- storage (EBS)
+- bandwidth
+
+Performance
+
+✅ very good (dedicated machine)
+✅ no cold starts
+
+Scaling
+- use Auto Scaling Group
+- scale manually/configured rules
+
+Pros
+- full server control
+- predictable performance
+- good for steady traffic
+
+Cons
+- manage OS/server
+- patching/monitoring
+- pay even idle
+
+Why not chosen -> Too much infrastructure management.
+
+-----------------------
+
+2. Amazon ECS Fargate
+How it works -> Deploy Dockerized NestJS container.
+|----------------------------------------|
+|     User -> ALB -> ECS Container       |
+|----------------------------------------|
+
+Container always running.
+Costing Based on:
+- vCPU
+- RAM
+- running time
+
+Performance
+
+✅ very good
+✅ no cold start
+
+Scaling: Auto scales by -> CPU, memory, request, count
+
+Example: 2 -> 20 containers
+Pros
+- easy container deployment
+- good scaling
+- no server management
+
+Cons
+- costlier at low traffic
+- always running
+
+Why not chosen -> Our traffic is bursty; paying continuously is inefficient.
+
+-----------------------
+
+3. Amazon EKS
+
+How it works -> Managed Kubernetes cluster.
+|--------------------------------------------|
+|     Load Balancer -> Kubernetes Pods       |
+|--------------------------------------------|
+
+Costing Based on:
+- cluster fee
+- worker nodes
+- storage/network
+
+Most expensive.
+Performance ✅ excellent
+
+Scaling
+               |------------------------|
+Kubernetes HPA:|  pods auto-scale       |
+               |------------------------|
+
+Pros
+- enterprise-grade
+- multi-service support
+
+Cons
+- complex
+- DevOps heavy
+
+Why not chosen -> Too complex for current application.
+
+-------------------
+
+4. AWS Elastic Beanstalk
+
+How it works -> Upload app, AWS deploys to EC2.
+|-------------------------|
+|     User -> ELB -> EC2  |
+|-------------------------|
+
+Costing - Pay for EC2 underneath.
+Performance - ✅ good
+Scaling - Uses EC2 autoscaling.
+
+Pros - easy deployment
+Cons
+- limited flexibility
+- still server-based
+
+Why not chosen -> Not truly serverless.
+
+------------------
+
+5. AWS Lambda (Chosen)
+
+How it works
+|--------------------------------------------|
+|    API Gateway -> Lambda -> DynamoDB       |
+|--------------------------------------------|
+
+Function runs only on request.
+Costing Based on: requests, duration, memory
+=> No traffic = no cost
+
+Performance
+- ✅ very fast after warm start
+- ⚠ cold start possible
+
+Scaling Automatic:
+|------------------------------------|
+|     100 -> 10,000 concurrent       |
+|------------------------------------|
+
+No setup needed.
+Pros
+- serverless
+- auto scaling
+- cheapest for burst traffic
+- zero maintenance
+
+Cons
+- cold starts
+- max 15 min runtime
+
+Why chosen - Perfect for short NestJS CRUD APIs.
+
+--------------------
+
+# Final comparison table
+
+| Service           | Cost Model     | Performance | Scaling   | Ops Effort | Fit for Our App |
+| ----------------- | -------------- | ----------- | --------- | ---------- | --------------- |
+| EC2               | fixed          | high        | manual    | high       | No              |
+| ECS Fargate       | always running | high        | auto      | medium     | No              |
+| EKS               | high fixed     | high        | auto      | very high  | No              |
+| Elastic Beanstalk | EC2-based      | good        | auto      | medium     | No              |
+| Lambda            | pay per use    | high        | automatic | low        | **Yes**         |
+
+---
+
+# Final decision
+We selected **AWS Lambda** because:
+- request-based backend
+- unpredictable traffic
+- need instant scaling
+- lower operational effort
+- best cost efficiency for our Todo app.
+
+
+Question
+--------------------------
+Other options = you have to  manage infrastructure**
+AWS Lambda = AWS manages infrastructure**
+
+That’s the biggest reason it wins.
+Here’s what you’re really getting:
+1. No server management (biggest benefit)
+With:
+- Amazon EC2
+- AWS Fargate
+- Amazon EKS
+- AWS Elastic Beanstalk
+
+You manage:
+- server sizing
+- OS patching
+- deployment
+- autoscaling rules
+- load balancer
+- health checks
+- monitoring
+- security updates
+
+
+With Lambda:
+- write function
+- deploy
+- done
+AWS handles the rest.
+
+# 2. No Load Balancer needed
+
+Others:
+|----------------------------------------|
+|  User -> ALB -> server/container       |
+|----------------------------------------|
+ALB cost: ~$20/month minimum ❌
+
+Lambda:
+|---------------------------------------|
+|  User ->  API Gateway ->  Lambda      |
+|---------------------------------------|
+- Uses Amazon API Gateway.
+- No ALB.
+- Cheaper.
+
+3. Pay only when code runs
+
+EC2/Fargate:
+|---------------------------------------|
+|    server running idle = paying       |
+|---------------------------------------|
+Example:
+|------------------------------------|
+|    100 requests/day                |
+|    still pay full month            |
+|------------------------------------|
+ Bad.
+
+Lambda:
+|------------------------|
+|  0 requests = $0       |
+|------------------------|
+Perfect for bursty apps.
+
+
+4. Auto scaling built-in
+
+EC2 Need:
+- autoscaling groups
+- scaling rules
+
+Fargate:
+- define task scaling
+
+EKS:
+- HPA
+- cluster autoscaler
+
+Lambda:
+|------------------------|
+|  nothing to configure  |
+|------------------------|
+AWS automatically:
+|------------------------------------|
+|    1 request -> 1 lambda           |
+|    1000 requests -> 1000 lambdash  |
+|------------------------------------|
+Easy.
+
+5. Cheaper for your use case
+
+Your app:
+
+```text
+Todo CRUD
+Notifications
+Mostly idle
+```
+
+Typical traffic:
+- morning spike
+- day low
+- evening spike
+
+This is bursty.
+Lambda is ideal.
+
+# Example cost
+If:
+|------------------------------------|
+|    200k requests/month             |
+|    300ms each                      |
+|------------------------------------|
+
+        |-------|
+Lambda: | ~$1–3 |
+        |-------|
+
+     |-------|
+EC2: | ~$30+ |
+     |-------|
+
+         |-------|
+Fargate: | ~$40+ |
+         |-------|
+
+
+Huge difference.
+---
+
+6. Faster development
+
+No need to learn:
+- Kubernetes
+- Docker orchestration
+- EC2 patching
+- Nginx
+- load balancers
+
+Team focuses on:-> business logic
+That increases velocity.
+
+7. Better AWS integration
+Lambda works naturally with:
+- Amazon DynamoDB
+- Amazon EventBridge
+- Amazon SQS
+- Amazon SNS
+- Amazon S3
+- AWS Step Functions
+
+Example:
+
+Todo created
+   |
+   v
+EventBridge
+   |
+   v
+Reminder Lambda
+   |
+   v
+  SNS
+
+
+# Best use cases for Lambda
+
+Use Lambda when app is:
+✅ API backend
+✅ CRUD app
+✅ event driven
+✅ webhook handler
+✅ notification system
+✅ scheduled jobs
+✅ burst traffic
+✅ MVP/startup
+
+Examples:
+* todo app
+* ecommerce API
+* auth service
+* payment webhook
+* chatbot backend
+
+Perfect for your project.
+
+# When NOT to use Lambda
+
+Avoid Lambda if:
+
+❌ long-running job (>15 min)
+❌ websocket-heavy real-time game/chat (sometimes ECS/EC2 better)
+❌ huge video processing
+❌ custom OS dependency
+❌ always-on background worker
+
+Then use:
+
+- Amazon ECS
+- Amazon EC2
+
+Final conclustion
+
+
+We chose AWS Lambda because our Todo API is short-lived, stateless, and bursty. 
+Lambda removes infrastructure management, eliminates load balancer/server costs, 
+scales automatically, and charges only per request—making it the 
+most cost-effective and operationally simple choice.
